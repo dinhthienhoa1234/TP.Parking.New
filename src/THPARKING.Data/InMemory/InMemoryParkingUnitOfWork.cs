@@ -8,6 +8,16 @@ namespace THPARKING.Data.InMemory
 {
     public class InMemoryParkingUnitOfWork : IUnitOfWork
     {
+        private readonly IList<ParkingCard> _cards;
+        private readonly IList<ParkingSession> _sessions;
+        private readonly IList<ParkingImage> _images;
+        private readonly IList<AuditLog> _auditLogs;
+
+        private IList<ParkingCard> _committedCards;
+        private IList<ParkingSession> _committedSessions;
+        private IList<ParkingImage> _committedImages;
+        private IList<AuditLog> _committedAuditLogs;
+
         private bool _isDisposed;
 
         public InMemoryParkingUnitOfWork(
@@ -21,10 +31,17 @@ namespace THPARKING.Data.InMemory
             if (images == null) throw new ArgumentNullException(nameof(images));
             if (auditLogs == null) throw new ArgumentNullException(nameof(auditLogs));
 
-            ParkingCards = new InMemoryParkingCardRepository(cards);
-            ParkingSessions = new InMemoryParkingSessionRepository(sessions);
-            ParkingImages = new InMemoryParkingImageRepository(images);
-            AuditLogs = new InMemoryAuditLogRepository(auditLogs);
+            _cards = cards;
+            _sessions = sessions;
+            _images = images;
+            _auditLogs = auditLogs;
+
+            CaptureCommittedSnapshot();
+
+            ParkingCards = new InMemoryParkingCardRepository(_cards);
+            ParkingSessions = new InMemoryParkingSessionRepository(_sessions);
+            ParkingImages = new InMemoryParkingImageRepository(_images);
+            AuditLogs = new InMemoryAuditLogRepository(_auditLogs);
         }
 
         public IParkingCardRepository ParkingCards { get; private set; }
@@ -38,11 +55,17 @@ namespace THPARKING.Data.InMemory
         public void Commit()
         {
             EnsureNotDisposed();
+            CaptureCommittedSnapshot();
         }
 
         public void Rollback()
         {
             EnsureNotDisposed();
+
+            RestoreList(_cards, _committedCards);
+            RestoreList(_sessions, _committedSessions);
+            RestoreList(_images, _committedImages);
+            RestoreList(_auditLogs, _committedAuditLogs);
         }
 
         public void Dispose()
@@ -53,6 +76,24 @@ namespace THPARKING.Data.InMemory
             }
 
             _isDisposed = true;
+        }
+
+        private void CaptureCommittedSnapshot()
+        {
+            _committedCards = new List<ParkingCard>(_cards);
+            _committedSessions = new List<ParkingSession>(_sessions);
+            _committedImages = new List<ParkingImage>(_images);
+            _committedAuditLogs = new List<AuditLog>(_auditLogs);
+        }
+
+        private static void RestoreList<T>(IList<T> target, IEnumerable<T> source)
+        {
+            target.Clear();
+
+            foreach (var item in source)
+            {
+                target.Add(item);
+            }
         }
 
         private void EnsureNotDisposed()
