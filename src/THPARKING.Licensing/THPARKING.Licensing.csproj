@@ -41,7 +41,16 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Class1.cs" />
+    <Compile Include="Core\LicenseCheckResult.cs" />
+    <Compile Include="Core\LicenseClient.cs" />
+    <Compile Include="Core\LicenseFingerprintService.cs" />
+    <Compile Include="Core\LicenseGate.cs" />
+    <Compile Include="Core\LicenseMachineIdProvider.cs" />
+    <Compile Include="Core\LicensePermission.cs" />
+    <Compile Include="Core\LicenseTokenValidator.cs" />
+    <Compile Include="Core\LicenseWarningPresenter.cs" />
+    <Compile Include="Core\LicenseWorker.cs" />
+    <Compile Include="Core\LocalLicenseStore.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
