@@ -46,6 +46,8 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Bootstrap\ParkingAppBootstrapper.cs" />
+    <Compile Include="Bootstrap\ParkingAppRuntime.cs" />
     <Compile Include="Form1.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -75,6 +77,24 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\THPARKING.Business\THPARKING.Business.csproj">
+      <Project>{82f6d64e-035a-4160-a8e2-279ac2c14a2e}</Project>
+      <Name>THPARKING.Business</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\THPARKING.Camera\THPARKING.Camera.csproj">
+      <Project>{3811592b-415d-45f2-bdc4-d6c0f13df512}</Project>
+      <Name>THPARKING.Camera</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\THPARKING.Device\THPARKING.Device.csproj">
+      <Project>{1b7b4625-c7a5-481e-abb4-db9074eb68ea}</Project>
+      <Name>THPARKING.Device</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\THPARKING.Licensing\THPARKING.Licensing.csproj">
+      <Project>{1138f0d4-658a-4d1c-8461-cd7f44025b60}</Project>
+      <Name>THPARKING.Licensing</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
