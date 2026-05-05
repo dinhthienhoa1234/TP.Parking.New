@@ -31,6 +31,9 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <PropertyGroup />
+  <PropertyGroup>
+    <ApplicationManifest>InOut\VehicleInResult.cs</ApplicationManifest>
+  </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.Core" />
@@ -42,6 +45,13 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="InOut\DuplicatePlateChecker.cs" />
+    <Compile Include="InOut\InOutBusinessService.cs" />
+    <Compile Include="InOut\ParkingFeeCalculator.cs" />
+    <Compile Include="InOut\VehicleInRequest.cs" />
+    <Compile Include="InOut\VehicleInResult.cs" />
+    <Compile Include="InOut\VehicleOutRequest.cs" />
+    <Compile Include="InOut\VehicleOutResult.cs" />
     <Compile Include="Lanes\LaneRouterService.cs" />
     <Compile Include="Lanes\LaneRuntimeState.cs" />
     <Compile Include="Lanes\LaneSwitchResult.cs" />
@@ -61,6 +71,10 @@
     <ProjectReference Include="..\THPARKING.Core\THPARKING.Core.csproj">
       <Project>{1af03d80-e93c-4111-b5a8-8249ff8409b3}</Project>
       <Name>THPARKING.Core</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\THPARKING.Licensing\THPARKING.Licensing.csproj">
+      <Project>{1138f0d4-658a-4d1c-8461-cd7f44025b60}</Project>
+      <Name>THPARKING.Licensing</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
