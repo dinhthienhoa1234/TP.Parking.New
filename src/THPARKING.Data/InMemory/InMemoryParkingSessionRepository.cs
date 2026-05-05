@@ -26,7 +26,7 @@ namespace THPARKING.Data.InMemory
             return _sessions.FirstOrDefault(s =>
                 s != null &&
                 string.Equals(s.CardCodeNormalized, normalizedCardCode, StringComparison.OrdinalIgnoreCase) &&
-                s.Status == ParkingSessionStatus.InParking &&
+                s.Status == ParkingSessionStatus.Open &&
                 s.TimeOut == null);
         }
 
