@@ -4,7 +4,7 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>1af03d80-e93c-4111-b5a8-8249ff8409b3</ProjectGuid>
+    <ProjectGuid>{1AF03D80-E93C-4111-B5A8-8249FF8409B3}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>THPARKING.Core</RootNamespace>
@@ -31,24 +31,32 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="System"/>
-    
-    <Reference Include="System.Core"/>
-    <Reference Include="System.Xml.Linq"/>
-    <Reference Include="System.Data.DataSetExtensions"/>
-    
-    
-    <Reference Include="Microsoft.CSharp"/>
-    
-    <Reference Include="System.Data"/>
-    
-    <Reference Include="System.Net.Http"/>
-    
-    <Reference Include="System.Xml"/>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Net.Http" />
+    <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Class1.cs" />
+    <Compile Include="Enums\CameraProviderType.cs" />
+    <Compile Include="Enums\CardStatus.cs" />
+    <Compile Include="Enums\LaneDirection.cs" />
+    <Compile Include="Enums\LaneSide.cs" />
+    <Compile Include="Enums\LicenseMode.cs" />
+    <Compile Include="Enums\LicenseStatus.cs" />
+    <Compile Include="Enums\ParkingLaneOrder.cs" />
+    <Compile Include="Enums\ParkingSessionStatus.cs" />
+    <Compile Include="Models\AuditLog.cs" />
+    <Compile Include="Models\MonthlyPass.cs" />
+    <Compile Include="Models\ParkingCard.cs" />
+    <Compile Include="Models\ParkingImage.cs" />
+    <Compile Include="Models\ParkingLane.cs" />
+    <Compile Include="Models\ParkingSession.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
- </Project>
+</Project>
