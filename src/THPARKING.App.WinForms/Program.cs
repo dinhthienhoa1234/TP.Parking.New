@@ -1,8 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using System.Windows.Forms;
+using THPARKING.App.WinForms.Bootstrap;
 
 namespace THPARKING.App.WinForms
 {
@@ -14,9 +12,30 @@ namespace THPARKING.App.WinForms
         [STAThread]
         static void Main()
         {
-            Application.EnableVisualStyles();
-            Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new Form1());
+            ParkingAppRuntime runtime = null;
+
+            try
+            {
+                Application.EnableVisualStyles();
+                Application.SetCompatibleTextRenderingDefault(false);
+
+                var bootstrapper = new ParkingAppBootstrapper();
+
+                runtime = bootstrapper.BuildDefaultRuntime(
+                    operatorCode: "admin",
+                    machineName: Environment.MachineName);
+
+                runtime.Start();
+
+                Application.Run(new Form1(runtime));
+            }
+            finally
+            {
+                if (runtime != null)
+                {
+                    runtime.Dispose();
+                }
+            }
         }
     }
 }
