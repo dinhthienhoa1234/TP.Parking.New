@@ -41,7 +41,13 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Class1.cs" />
+    <Compile Include="CardReaders\CardBusinessResult.cs" />
+    <Compile Include="CardReaders\CardCodeService.cs" />
+    <Compile Include="CardReaders\CardReadResult.cs" />
+    <Compile Include="CardReaders\CR208ReaderDevice.cs" />
+    <Compile Include="CardReaders\CR501ReaderDevice.cs" />
+    <Compile Include="CardReaders\ICardReaderDevice.cs" />
+    <Compile Include="CardReaders\SerialPortReaderDevice.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
@@ -50,5 +56,6 @@
       <Name>THPARKING.Core</Name>
     </ProjectReference>
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
