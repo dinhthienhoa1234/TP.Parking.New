@@ -56,6 +56,12 @@
     <Compile Include="Lanes\LaneRuntimeState.cs" />
     <Compile Include="Lanes\LaneSwitchResult.cs" />
     <Compile Include="Lanes\ParkingLaneConfig.cs" />
+    <Compile Include="Orchestration\ParkingAppContext.cs" />
+    <Compile Include="Orchestration\ParkingAppOrchestrator.cs" />
+    <Compile Include="Orchestration\ParkingVehicleInFlowRequest.cs" />
+    <Compile Include="Orchestration\ParkingVehicleInFlowResult.cs" />
+    <Compile Include="Orchestration\ParkingVehicleOutFlowRequest.cs" />
+    <Compile Include="Orchestration\ParkingVehicleOutFlowResult.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Sync\InMemorySyncOutboxStore.cs" />
     <Compile Include="Sync\ISyncOutboxStore.cs" />
@@ -68,9 +74,17 @@
     <Compile Include="Sync\SyncWorker.cs" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\THPARKING.Camera\THPARKING.Camera.csproj">
+      <Project>{3811592b-415d-45f2-bdc4-d6c0f13df512}</Project>
+      <Name>THPARKING.Camera</Name>
+    </ProjectReference>
     <ProjectReference Include="..\THPARKING.Core\THPARKING.Core.csproj">
       <Project>{1af03d80-e93c-4111-b5a8-8249ff8409b3}</Project>
       <Name>THPARKING.Core</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\THPARKING.Device\THPARKING.Device.csproj">
+      <Project>{1b7b4625-c7a5-481e-abb4-db9074eb68ea}</Project>
+      <Name>THPARKING.Device</Name>
     </ProjectReference>
     <ProjectReference Include="..\THPARKING.Licensing\THPARKING.Licensing.csproj">
       <Project>{1138f0d4-658a-4d1c-8461-cd7f44025b60}</Project>
