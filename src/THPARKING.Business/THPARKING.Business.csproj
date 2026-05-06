@@ -82,6 +82,10 @@
       <Project>{1af03d80-e93c-4111-b5a8-8249ff8409b3}</Project>
       <Name>THPARKING.Core</Name>
     </ProjectReference>
+    <ProjectReference Include="..\THPARKING.Data\THPARKING.Data.csproj">
+      <Project>{d644831d-ba8c-4f72-b6ec-c5b523f67181}</Project>
+      <Name>THPARKING.Data</Name>
+    </ProjectReference>
     <ProjectReference Include="..\THPARKING.Device\THPARKING.Device.csproj">
       <Project>{1b7b4625-c7a5-481e-abb4-db9074eb68ea}</Project>
       <Name>THPARKING.Device</Name>

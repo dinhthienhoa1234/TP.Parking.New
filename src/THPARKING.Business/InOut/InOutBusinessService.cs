@@ -2,6 +2,7 @@
 using THPARKING.Business.Sync;
 using THPARKING.Core.Enums;
 using THPARKING.Core.Models;
+using THPARKING.Data.UnitOfWork;
 using THPARKING.Licensing.Core;
 
 namespace THPARKING.Business.InOut
@@ -12,63 +13,131 @@ namespace THPARKING.Business.InOut
         private readonly SyncOutboxService _syncOutboxService;
         private readonly ParkingFeeCalculator _feeCalculator;
         private readonly DuplicatePlateChecker _plateChecker;
+        private readonly IUnitOfWork _unitOfWork;
 
         public InOutBusinessService(
             LicenseGate licenseGate,
             SyncOutboxService syncOutboxService,
             ParkingFeeCalculator feeCalculator,
             DuplicatePlateChecker plateChecker)
+            : this(licenseGate, syncOutboxService, feeCalculator, plateChecker, null)
+        {
+        }
+
+        public InOutBusinessService(
+            LicenseGate licenseGate,
+            SyncOutboxService syncOutboxService,
+            ParkingFeeCalculator feeCalculator,
+            DuplicatePlateChecker plateChecker,
+            IUnitOfWork unitOfWork)
         {
             _licenseGate = licenseGate;
             _syncOutboxService = syncOutboxService;
             _feeCalculator = feeCalculator ?? new ParkingFeeCalculator();
             _plateChecker = plateChecker ?? new DuplicatePlateChecker();
+            _unitOfWork = unitOfWork;
         }
 
         public VehicleInResult ProcessVehicleIn(VehicleInRequest request)
         {
-            var validationMessage = ValidateVehicleInRequest(request);
+            string validationMessage = ValidateVehicleInRequest(request);
             if (!string.IsNullOrWhiteSpace(validationMessage))
                 return VehicleInResult.Fail(validationMessage);
 
             if (_licenseGate != null && !_licenseGate.Can(LicensePermission.AllowVehicleIn))
                 return VehicleInResult.Fail("License không cho phép xe vào mới.");
 
-            var now = request.TimeIn == DateTime.MinValue ? DateTime.Now : request.TimeIn;
+            DateTime now = request.TimeIn == DateTime.MinValue ? DateTime.Now : request.TimeIn;
 
-            var session = new ParkingSession
+            if (_unitOfWork == null)
             {
-                ParkingSessionId = Guid.NewGuid(),
-                ParkingCardId = Guid.Empty,
-                CardCodeNormalized = request.CardCodeNormalized,
-                PlateNumber = request.PlateNumber,
-                PlateNumberNormalized = request.PlateNumberNormalized,
-                TimeIn = now,
-                EntryLaneCode = request.LaneCode,
-                Status = ParkingSessionStatus.Open,
-                CreatedAt = now
-            };
+                // Temporary fallback for bootstrap compatibility before Data UoW wiring is complete.
+                ParkingSession fallbackSession = new ParkingSession
+                {
+                    ParkingSessionId = Guid.NewGuid(),
+                    ParkingCardId = Guid.Empty,
+                    CardCodeNormalized = request.CardCodeNormalized,
+                    PlateNumber = request.PlateNumber,
+                    PlateNumberNormalized = request.PlateNumberNormalized,
+                    TimeIn = now,
+                    EntryLaneCode = request.LaneCode,
+                    Status = ParkingSessionStatus.Open,
+                    CreatedAt = now
+                };
 
-            EnqueueSync(
-                SyncEventType.VehicleInCreated,
-                "ParkingSession",
-                session.ParkingSessionId.ToString(),
-                BuildVehicleInPayload(request, session),
-                request.MachineName);
+                EnqueueSync(
+                    SyncEventType.VehicleInCreated,
+                    "ParkingSession",
+                    fallbackSession.ParkingSessionId.ToString(),
+                    BuildVehicleInPayload(request, fallbackSession),
+                    request.MachineName);
 
-            return VehicleInResult.Ok(session, "Xe vào hợp lệ.");
+                return VehicleInResult.Ok(fallbackSession, "Xe vào hợp lệ.");
+            }
+
+            try
+            {
+                ParkingCard card = _unitOfWork.ParkingCards.FindByNormalizedCardCode(request.CardCodeNormalized);
+                if (card == null)
+                    return VehicleInResult.Fail("Thẻ chưa được đăng ký.");
+
+                if (!IsCardUsable(card))
+                    return VehicleInResult.Fail("Thẻ không khả dụng để xe vào.");
+
+                ParkingSession openSession = _unitOfWork.ParkingSessions.FindOpenByNormalizedCardCode(request.CardCodeNormalized);
+                if (openSession != null)
+                    return VehicleInResult.Fail("Thẻ đang có xe trong bãi.");
+
+                ParkingSession session = new ParkingSession
+                {
+                    ParkingSessionId = Guid.NewGuid(),
+                    ParkingCardId = card.ParkingCardId,
+                    CardCodeNormalized = request.CardCodeNormalized,
+                    PlateNumber = request.PlateNumber,
+                    PlateNumberNormalized = request.PlateNumberNormalized,
+                    TimeIn = now,
+                    EntryLaneCode = request.LaneCode,
+                    Status = ParkingSessionStatus.Open,
+                    CreatedAt = now
+                };
+
+                _unitOfWork.ParkingSessions.Add(session);
+
+                AddAuditLog(
+                    "VehicleIn",
+                    session,
+                    request.OperatorCode,
+                    request.MachineName,
+                    BuildAuditDescription(request.CardCodeNormalized, request.PlateNumberNormalized, request.LaneCode, null),
+                    now);
+
+                EnqueueSync(
+                    SyncEventType.VehicleInCreated,
+                    "ParkingSession",
+                    session.ParkingSessionId.ToString(),
+                    BuildVehicleInPayload(request, session),
+                    request.MachineName);
+
+                _unitOfWork.Commit();
+                return VehicleInResult.Ok(session, "Xe vào hợp lệ.");
+            }
+            catch
+            {
+                TryRollback();
+                return VehicleInResult.Fail("Có lỗi khi xử lý xe vào. Vui lòng thử lại.");
+            }
         }
 
         public VehicleOutResult ProcessVehicleOut(VehicleOutRequest request)
         {
-            var validationMessage = ValidateVehicleOutRequest(request);
+            string validationMessage = ValidateVehicleOutRequest(request);
             if (!string.IsNullOrWhiteSpace(validationMessage))
                 return VehicleOutResult.Fail(validationMessage);
 
-            var normalOutAllowed = _licenseGate == null ||
+            bool normalOutAllowed = _licenseGate == null ||
                                    _licenseGate.Can(LicensePermission.AllowVehicleOut);
 
-            var emergencyOutAllowed = _licenseGate == null ||
+            bool emergencyOutAllowed = _licenseGate == null ||
                                       _licenseGate.Can(LicensePermission.AllowEmergencyVehicleOut);
 
             if (!normalOutAllowed && !request.IsEmergencyExit)
@@ -77,47 +146,190 @@ namespace THPARKING.Business.InOut
             if (request.IsEmergencyExit && !emergencyOutAllowed)
                 return VehicleOutResult.Fail("License không cho phép xe ra emergency.");
 
-            if (_plateChecker.IsPlateMismatch(
-                request.OriginalPlateNumberNormalized,
-                request.PlateNumberNormalized))
+            DateTime timeOut = request.TimeOut == DateTime.MinValue ? DateTime.Now : request.TimeOut;
+
+            if (_unitOfWork == null)
             {
-                return VehicleOutResult.Fail("Biển số không khớp. Vui lòng kiểm tra lại.");
+                // Temporary fallback for bootstrap compatibility before Data UoW wiring is complete.
+                if (_plateChecker.IsPlateMismatch(
+                    request.OriginalPlateNumberNormalized,
+                    request.PlateNumberNormalized))
+                {
+                    return VehicleOutResult.Fail("Biển số không khớp. Vui lòng kiểm tra lại.");
+                }
+
+                DateTime timeInFallback = request.OriginalTimeIn.HasValue ? request.OriginalTimeIn.Value : timeOut;
+                decimal fallbackFeeAmount = _feeCalculator.Calculate(timeInFallback, timeOut);
+
+                ParkingSession fallbackSession = new ParkingSession
+                {
+                    ParkingSessionId = Guid.NewGuid(),
+                    ParkingCardId = Guid.Empty,
+                    CardCodeNormalized = request.CardCodeNormalized,
+                    PlateNumber = request.PlateNumber,
+                    PlateNumberNormalized = request.PlateNumberNormalized,
+                    TimeIn = timeInFallback,
+                    TimeOut = timeOut,
+                    ExitLaneCode = request.LaneCode,
+                    Status = request.IsEmergencyExit ? ParkingSessionStatus.EmergencyClosed : ParkingSessionStatus.Closed,
+                    FeeAmount = fallbackFeeAmount,
+                    IsEmergencyExit = request.IsEmergencyExit,
+                    EmergencyReason = request.EmergencyReason,
+                    UpdatedAt = timeOut
+                };
+
+                EnqueueSync(
+                    SyncEventType.VehicleOutCreated,
+                    "ParkingSession",
+                    fallbackSession.ParkingSessionId.ToString(),
+                    BuildVehicleOutPayload(request, fallbackSession, fallbackFeeAmount),
+                    request.MachineName);
+
+                return VehicleOutResult.Ok(
+                    fallbackSession,
+                    fallbackFeeAmount,
+                    request.IsEmergencyExit,
+                    request.IsEmergencyExit ? "Xe ra emergency hợp lệ." : "Xe ra hợp lệ.");
             }
 
-            var timeOut = request.TimeOut == DateTime.MinValue ? DateTime.Now : request.TimeOut;
-            var timeIn = request.OriginalTimeIn.HasValue ? request.OriginalTimeIn.Value : timeOut;
-
-            var feeAmount = _feeCalculator.Calculate(timeIn, timeOut);
-
-            var session = new ParkingSession
+            try
             {
-                ParkingSessionId = Guid.NewGuid(),
-                ParkingCardId = Guid.Empty,
-                CardCodeNormalized = request.CardCodeNormalized,
-                PlateNumber = request.PlateNumber,
-                PlateNumberNormalized = request.PlateNumberNormalized,
-                TimeIn = timeIn,
-                TimeOut = timeOut,
-                ExitLaneCode = request.LaneCode,
-                Status = ParkingSessionStatus.Closed,
-                FeeAmount = feeAmount,
-                IsEmergencyExit = request.IsEmergencyExit,
-                EmergencyReason = request.EmergencyReason,
-                UpdatedAt = timeOut
+                ParkingSession session = _unitOfWork.ParkingSessions.FindOpenByNormalizedCardCode(request.CardCodeNormalized);
+                bool isNewEmergencySession = false;
+
+                if (session == null && !request.IsEmergencyExit)
+                    return VehicleOutResult.Fail("Không tìm thấy xe đang gửi trong bãi.");
+
+                if (session == null)
+                {
+                    session = new ParkingSession
+                    {
+                        ParkingSessionId = Guid.NewGuid(),
+                        ParkingCardId = Guid.Empty,
+                        CardCodeNormalized = request.CardCodeNormalized,
+                        TimeIn = request.OriginalTimeIn.HasValue ? request.OriginalTimeIn.Value : timeOut,
+                        CreatedAt = timeOut
+                    };
+
+                    isNewEmergencySession = true;
+                }
+
+                if (_plateChecker.IsPlateMismatch(
+                    session.PlateNumberNormalized,
+                    request.PlateNumberNormalized))
+                {
+                    return VehicleOutResult.Fail("Biển số không khớp. Vui lòng kiểm tra lại.");
+                }
+
+                DateTime timeIn = session.TimeIn == DateTime.MinValue
+                    ? (request.OriginalTimeIn.HasValue ? request.OriginalTimeIn.Value : timeOut)
+                    : session.TimeIn;
+
+                decimal feeAmount = _feeCalculator.Calculate(timeIn, timeOut);
+
+                if (!string.IsNullOrWhiteSpace(request.PlateNumber))
+                    session.PlateNumber = request.PlateNumber;
+
+                if (!string.IsNullOrWhiteSpace(request.PlateNumberNormalized))
+                    session.PlateNumberNormalized = request.PlateNumberNormalized;
+
+                session.TimeOut = timeOut;
+                session.ExitLaneCode = request.LaneCode;
+                session.Status = request.IsEmergencyExit ? ParkingSessionStatus.EmergencyClosed : ParkingSessionStatus.Closed;
+                session.FeeAmount = feeAmount;
+                session.IsEmergencyExit = request.IsEmergencyExit;
+                session.EmergencyReason = request.EmergencyReason;
+                session.UpdatedAt = timeOut;
+
+                if (isNewEmergencySession)
+                    _unitOfWork.ParkingSessions.Add(session);
+                else
+                    _unitOfWork.ParkingSessions.Update(session);
+
+                string actionType = request.IsEmergencyExit ? "EmergencyVehicleOut" : "VehicleOut";
+                AddAuditLog(
+                    actionType,
+                    session,
+                    request.OperatorCode,
+                    request.MachineName,
+                    BuildAuditDescription(request.CardCodeNormalized, session.PlateNumberNormalized, request.LaneCode, feeAmount),
+                    timeOut);
+
+                EnqueueSync(
+                    SyncEventType.VehicleOutCreated,
+                    "ParkingSession",
+                    session.ParkingSessionId.ToString(),
+                    BuildVehicleOutPayload(request, session, feeAmount),
+                    request.MachineName);
+
+                _unitOfWork.Commit();
+
+                return VehicleOutResult.Ok(
+                    session,
+                    feeAmount,
+                    request.IsEmergencyExit,
+                    request.IsEmergencyExit ? "Xe ra emergency hợp lệ." : "Xe ra hợp lệ.");
+            }
+            catch
+            {
+                TryRollback();
+                return VehicleOutResult.Fail("Có lỗi khi xử lý xe ra. Vui lòng thử lại.");
+            }
+        }
+
+        private bool IsCardUsable(ParkingCard card)
+        {
+            if (card == null)
+                return false;
+
+            return card.Status == CardStatus.Active;
+        }
+
+        private void AddAuditLog(
+            string actionType,
+            ParkingSession session,
+            string operatorCode,
+            string machineName,
+            string description,
+            DateTime createdAt)
+        {
+            if (_unitOfWork == null || _unitOfWork.AuditLogs == null || session == null)
+                return;
+
+            AuditLog log = new AuditLog
+            {
+                AuditLogId = Guid.NewGuid(),
+                ActionType = actionType,
+                EntityType = "ParkingSession",
+                EntityId = session.ParkingSessionId,
+                OperatorCode = operatorCode,
+                MachineName = machineName,
+                Description = description,
+                CreatedAt = createdAt
             };
 
-            EnqueueSync(
-                SyncEventType.VehicleOutCreated,
-                "ParkingSession",
-                session.ParkingSessionId.ToString(),
-                BuildVehicleOutPayload(request, session, feeAmount),
-                request.MachineName);
+            _unitOfWork.AuditLogs.Add(log);
+        }
 
-            return VehicleOutResult.Ok(
-                session,
-                feeAmount,
-                request.IsEmergencyExit,
-                request.IsEmergencyExit ? "Xe ra emergency hợp lệ." : "Xe ra hợp lệ.");
+        private string BuildAuditDescription(string cardCode, string plateNumber, string laneCode, decimal? feeAmount)
+        {
+            string feePart = feeAmount.HasValue ? ", phí=" + feeAmount.Value : string.Empty;
+            return "Thẻ=" + Safe(cardCode) + ", biển số=" + Safe(plateNumber) + ", làn=" + Safe(laneCode) + feePart;
+        }
+
+        private void TryRollback()
+        {
+            if (_unitOfWork == null)
+                return;
+
+            try
+            {
+                _unitOfWork.Rollback();
+            }
+            catch
+            {
+                // Ignore rollback errors to preserve safe failure response.
+            }
         }
 
         private string ValidateVehicleInRequest(VehicleInRequest request)
