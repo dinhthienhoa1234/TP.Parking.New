@@ -195,6 +195,8 @@ namespace THPARKING.Business.InOut
             try
             {
                 ParkingSession session = _unitOfWork.ParkingSessions.FindOpenByNormalizedCardCode(request.CardCodeNormalized);
+                bool isNewEmergencySession = false;
+
                 if (session == null && !request.IsEmergencyExit)
                     return VehicleOutResult.Fail("Không tìm thấy xe đang gửi trong bãi.");
 
@@ -209,7 +211,7 @@ namespace THPARKING.Business.InOut
                         CreatedAt = timeOut
                     };
 
-                    _unitOfWork.ParkingSessions.Add(session);
+                    isNewEmergencySession = true;
                 }
 
                 if (_plateChecker.IsPlateMismatch(
@@ -239,7 +241,10 @@ namespace THPARKING.Business.InOut
                 session.EmergencyReason = request.EmergencyReason;
                 session.UpdatedAt = timeOut;
 
-                _unitOfWork.ParkingSessions.Update(session);
+                if (isNewEmergencySession)
+                    _unitOfWork.ParkingSessions.Add(session);
+                else
+                    _unitOfWork.ParkingSessions.Update(session);
 
                 string actionType = request.IsEmergencyExit ? "EmergencyVehicleOut" : "VehicleOut";
                 AddAuditLog(
